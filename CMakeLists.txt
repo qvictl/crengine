@@ -170,6 +170,7 @@ endfunction()
 option(DISABLE_CLOEXEC "force disable closexec support" OFF)
 option(DISABLE_LFS     "force disable LFS support"      OFF)
 option(OWN_MEM_MAN     "use custom memory manager"      ON)
+option(BUILD_FONT_TESTS "build native font lifecycle regression tests" OFF)
 
 # Feature options.
 set(AUTO AUTO CACHE STRING "override value of all 'auto' features")
@@ -285,6 +286,20 @@ target_include_directories(crengine PUBLIC crengine/include)
 target_link_libraries(crengine PRIVATE ${CRE_LIBS})
 
 # }}}
+
+if(BUILD_FONT_TESTS)
+    set(FONT_TEST_FILE "" CACHE FILEPATH "TrueType font fixture for native font tests")
+    if(NOT EXISTS "${FONT_TEST_FILE}")
+        message(FATAL_ERROR "BUILD_FONT_TESTS requires an existing FONT_TEST_FILE")
+    endif()
+    enable_testing()
+    add_executable(font_gc_test crengine/tests/font_gc_test.cpp)
+    target_compile_features(font_gc_test PRIVATE cxx_std_17)
+    target_include_directories(font_gc_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    set_target_properties(font_gc_test PROPERTIES ENABLE_EXPORTS ON)
+    target_link_libraries(font_gc_test PRIVATE crengine ${CRE_LIBS} ${CMAKE_DL_LIBS})
+    add_test(NAME font_gc COMMAND font_gc_test "${FONT_TEST_FILE}")
+endif()
 
 # linting {{{
 

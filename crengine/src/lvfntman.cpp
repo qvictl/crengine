@@ -16,6 +16,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <vector>
 
 #include "../include/lvfntman.h"
 #include "../include/lvstream.h"
@@ -5369,6 +5370,7 @@ public:
     virtual void setHintingMode(hinting_mode_t m)  { _font->setHintingMode(m); }
     virtual hinting_mode_t getHintingMode() const  { return _font->getHintingMode(); }
     virtual void clearCache()      { _font->clearCache(); }
+    virtual void clearFontRefs()   { _font->clearFontRefs(); }
     virtual bool kerningEnabled()  { return _font->kerningEnabled(); }
     virtual bool IsNull()  const   { return _font->IsNull(); }
     virtual bool operator!() const { return !_font; }
@@ -5424,6 +5426,7 @@ public:
     virtual void setKerningMode(kerning_mode_t m) { LVFontProxy::setKerningMode(m); _smallFont->setKerningMode(m); }
     virtual void setHintingMode(hinting_mode_t m) { LVFontProxy::setHintingMode(m); _smallFont->setHintingMode(m); }
     virtual void clearCache() { LVFontProxy::clearCache(); _smallFont->clearCache(); }
+    virtual void clearFontRefs() { LVFontProxy::clearFontRefs(); _smallFont->clearFontRefs(); }
     virtual void Clear()      { LVFontProxy::Clear();      _smallRef.Clear(); }
     virtual bool hasOTMathSupport() const { return false; }
 
@@ -6768,10 +6771,10 @@ class LVFontInstanceCache {
         LVFontInstanceKey key;
         LVFontRef         font;
     };
-    LVArray<Entry> _entries;
+    std::vector<Entry> _entries;
 public:
     LVFontRef get(const LVFontInstanceKey& key) const {
-        for (int i = 0; i < _entries.length(); i++) {
+        for (int i = 0; i < length(); i++) {
             if (_entries[i].key == key) {
                 assert(!_entries[i].font.isNull()); // put() only stores valid refs; gc() removes null ones
                 return _entries[i].font;
@@ -6780,7 +6783,7 @@ public:
         return LVFontRef();
     }
     void put(const LVFontInstanceKey& key, LVFontRef font) {
-        for (int i = 0; i < _entries.length(); i++) {
+        for (int i = 0; i < length(); i++) {
             if (_entries[i].key == key) {
                 _entries[i].font = font;
                 return;
@@ -6789,10 +6792,10 @@ public:
         Entry e;
         e.key  = key;
         e.font = font;
-        _entries.add(e);
+        _entries.push_back(e);
     }
     bool hasFaceId(lUInt32 face_id) const {
-        for (int i = 0; i < _entries.length(); i++)
+        for (int i = 0; i < length(); i++)
             if (_entries[i].key.face_id == face_id)
                 return true;
         return false;
@@ -6803,10 +6806,10 @@ public:
     // Evict instances whose face_id is in the provided set.
     // Call before removeFonts() so the registry still holds the face IDs.
     void evictFaces(const LVArray<lUInt32>& face_ids) {
-        for (int i = _entries.length() - 1; i >= 0; i--)
+        for (int i = length() - 1; i >= 0; i--)
             for (int j = 0; j < face_ids.length(); j++)
                 if (_entries[i].key.face_id == face_ids[j]) {
-                    _entries.remove(i);
+                    _entries.erase(_entries.begin() + i);
                     break;
                 }
     }
@@ -6814,22 +6817,31 @@ public:
     void clearAll() {
         _entries.clear();
     }
-    int length() const { return _entries.length(); }
+    int length() const { return static_cast<int>(_entries.size()); }
 
     /// Call f(font) for every live instance.  Used by mode-change methods
     /// (SetAntialiasMode, SetHintingMode, SetKerningMode, clearGlyphCache).
     template<typename Fn>
     void forEachFont(Fn f) {
-        for (int i = 0; i < _entries.length(); i++)
+        for (int i = 0; i < length(); i++)
             if (!_entries[i].font.isNull())
                 f(_entries[i].font);
     }
 
     void gc() {
-        for (int i = _entries.length() - 1; i >= 0; i--) {
-            if (_entries[i].font.isNull() || _entries[i].font.getRefCount() == 1)
-                _entries.remove(i);
-        }
+        // Fallbacks and list markers can keep cached fonts alive, including
+        // themselves. Drop these lazy references before examining ownership.
+        forEachFont([](LVFontRef& font) { font->clearFontRefs(); });
+        int previous_length;
+        do {
+            previous_length = length();
+            for (int i = length() - 1; i >= 0; i--) {
+                if (_entries[i].font.isNull() || _entries[i].font.getRefCount() == 1)
+                    _entries.erase(_entries.begin() + i);
+            }
+            // Destroying a synthetic font can release another cached font
+            // that was visited earlier in this pass.
+        } while (length() < previous_length);
     }
 };
 
