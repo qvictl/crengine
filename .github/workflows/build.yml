@@ -48,6 +48,7 @@ jobs:
           clang-tidy
           cppcheck
           jq
+          fonts-dejavu-core
           libfreetype-dev
           libfribidi-dev
           libharfbuzz-dev
@@ -91,6 +92,8 @@ jobs:
       run: |
         cmake -B build -S . -G Ninja \
           -DCMAKE_BUILD_TYPE=${{ matrix.flavor }} \
+          -DBUILD_FONT_TESTS=ON \
+          -DFONT_TEST_FILE=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf \
           -DCMAKE_COLOR_DIAGNOSTICS=ON 2>&1
         printf '%s\n' NINJA_STATUS="$(printf '\e[32;1m%%p⎹\e[0m ')" >>"${GITHUB_ENV}"
         printf '%s\n' BUILDCACHE_DIR="$PWD/bcache" >>"${GITHUB_ENV}"
@@ -100,3 +103,6 @@ jobs:
 
     - name: Lint
       run: ninja -C build lint -k0 2>&1
+
+    - name: Font lifecycle regression
+      run: ctest --test-dir build --output-on-failure
