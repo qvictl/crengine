@@ -6,8 +6,9 @@ submitted to this fork, not to the upstream project.
 Before merging a pull request:
 
 - Both Debug and Release build, lint and native font-lifecycle tests must pass.
-- CodeRabbit must finish reviewing the latest commit; blocking findings must be
-  fixed or answered, and review threads resolved.
+- An independent AI agent must review the latest commit; findings must be fixed
+  or answered. CodeRabbit is requested when the app covers this fork; this new
+  dependency fork is not currently covered by the existing app installation.
 - The candidate commit must pass the required qvictl/koreader-base checks and the
   matching KOReader emulator integration tests before the engine PR is merged.
 - Font-memory changes require paired measurements with the same book, fonts,
