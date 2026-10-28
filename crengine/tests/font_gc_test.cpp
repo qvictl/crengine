@@ -57,6 +57,7 @@ int main(int argc, char **argv) {
     LVFontRef first = fontMan->GetFont(20, 400, false, css_ff_serif, family);
     LVFontRef second = fontMan->GetFont(24, 400, false, css_ff_serif, family);
     check(!first.isNull() && !second.isNull(), "font instances could not be loaded");
+    check(live_faces >= 2, "the observer must track the loaded font instances");
     check(first.getRefCount() == 2 && second.getRefCount() == 2,
           "each fresh instance must be owned only by its caller and the cache");
 
